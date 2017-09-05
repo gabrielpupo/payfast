@@ -16,4 +16,4 @@ PagamentoDao.prototype.atualiza = function(pagamento,callback) {
 
 module.exports = function(){
     return PagamentoDao;
-};
+}; 
