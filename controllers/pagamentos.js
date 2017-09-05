@@ -67,7 +67,7 @@ module.exports = function(app){
   });
 
 
-  //ROTA PARA CANCELAR PAGAMENTOS
+  //ROTA PARA CANCELAR PAGAMENTOS !
   app.delete('/pagamentos/pagamento/:id', function(req,res){
     var pagamento = {};
     pagamento.id = req.params.id;
