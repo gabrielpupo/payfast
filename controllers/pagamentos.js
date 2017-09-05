@@ -22,9 +22,7 @@ module.exports = function(app){
                 console.log('requisição recebida na porta 3000')
                 res.send(results);        
             }
-
-        });
-        
+        });        
     });        
 
 
