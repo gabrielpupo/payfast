@@ -24,7 +24,9 @@ module.exports = function(app){
       return;
     }
 
-    pagamento.status = 'CRIADO';
+    const PAGAMENTO_CRIADO = "CRIADO";
+
+    pagamento.status = PAGAMENTO_CRIADO;
     pagamento.data = new Date;
 
     var connection = app.persistencia.connectionFactory();
@@ -35,9 +37,27 @@ module.exports = function(app){
         console.log('Erro ao inserir no banco:' + erro);
         res.status(500).send(erro);
       } else {
-      console.log('Pagamento Criado. ID: ' + resultado.insertId);
-      res.location('/pagamentos/pagamento/' + resultado.insertId);
-      res.status(201).json(pagamento);
+      pagamento.id = resultado.insertId;
+      console.log('Pagamento Criado. ID: ' + pagamento.id);
+      res.location('/pagamentos/pagamento/' + pagamento.id);
+
+      var response = {
+        dados_do_pagamento: pagamento,
+        links: [
+          {
+            href:"http://localhost:3000/pagamentos/pagamento/" + pagamento.id,
+            rel:"CONFIRMAR",
+            method:"PUT"
+          },
+          {
+            href:"http://localhost:3000/pagamentos/pagamento/" + pagamento.id,
+            rel:"CANCELAR",
+            method:"DELETE"
+          }
+        ]
+      }
+
+      res.status(201).json(response);
       }
       connection.end();
     });
@@ -48,8 +68,10 @@ module.exports = function(app){
     var pagamento = {};
     var id = req.params.id;
 
+    const PAGAMENTO_CONFIRMADO = 'CONFIRMADO';
+
     pagamento.id = id;
-    pagamento.status = 'CONFIRMADO';
+    pagamento.status = PAGAMENTO_CONFIRMADO;
     pagamento.data = new Date;
 
     var connection = app.persistencia.connectionFactory();
@@ -70,8 +92,10 @@ module.exports = function(app){
   //ROTA PARA CANCELAR PAGAMENTOS !
   app.delete('/pagamentos/pagamento/:id', function(req,res){
     var pagamento = {};
+
+    const PAGAMENTO_CANCELADO = 'CANCELADO;'
     pagamento.id = req.params.id;
-    pagamento.status = 'CANCELADO';
+    pagamento.status = PAGAMENTO_CANCELADO;
 
     var connection = app.persistencia.connectionFactory();
     var pagamentoDao = new app.persistencia.PagamentoDao(connection);
