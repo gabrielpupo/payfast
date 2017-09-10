@@ -1,5 +1,10 @@
 module.exports = function(app){
 
+  const PAGAMENTO_CRIADO = "CRIADO";
+  const PAGAMENTO_CONFIRMADO = 'CONFIRMADO';
+  const PAGAMENTO_CANCELADO = 'CANCELADO';
+  const PAGAMENTO_NAO_AUTORIZADO = 'NAO AUTORIZADO';
+
   // ROTA DE TESTE
   app.get('/pagamentos', function(req, res){
     console.log('Recebida requisicao de teste na porta 3000.')
@@ -11,10 +16,11 @@ module.exports = function(app){
   app.post('/pagamentos/pagamento', function(req, res){
     console.log('processando uma requisicao de um novo pagamento');
 
-    var pagamento = req.body;
+    var pagamento = req.body["pagamento"];
+    var cartao = req.body["cartao"];
 
-    req.assert("forma_de_pagamento","Forma de pagamento eh obrigatorio").notEmpty();
-    req.assert("valor","Valor eh obrigatorio e deve ser um decimal").notEmpty().isFloat();
+    req.assert("pagamento.forma_de_pagamento","Forma de pagamento eh obrigatorio").notEmpty();
+    req.assert("pagamento.valor","Valor eh obrigatorio e deve ser um decimal").notEmpty().isFloat();
 
     var erros = req.validationErrors();
 
@@ -23,8 +29,6 @@ module.exports = function(app){
       res.status(400).send(erros);
       return;
     }
-
-    const PAGAMENTO_CRIADO = "CRIADO";
 
     pagamento.status = PAGAMENTO_CRIADO;
     pagamento.data = new Date;
@@ -36,39 +40,80 @@ module.exports = function(app){
       if(erro){
         console.log('Erro ao inserir no banco:' + erro);
         res.status(500).send(erro);
-      } else {
-      pagamento.id = resultado.insertId;
-      console.log('Pagamento Criado. ID: ' + pagamento.id);
-      res.location('/pagamentos/pagamento/' + pagamento.id);
 
-      var response = {
-        dados_do_pagamento: pagamento,
-        links: [
-          {
-            href:"http://localhost:3000/pagamentos/pagamento/" + pagamento.id,
-            rel:"CONFIRMAR",
-            method:"PUT"
-          },
-          {
-            href:"http://localhost:3000/pagamentos/pagamento/" + pagamento.id,
-            rel:"CANCELAR",
-            method:"DELETE"
+      }else{
+
+        if(pagamento.forma_de_pagamento == 'cartao'){
+          var clienteCartoes = new app.servicos.cartoesClient();
+          clienteCartoes.autoriza(cartao, function(exception, request, response, retorno){
+
+            if(exception){
+              console.log(exception);
+              res.status(400).send(exception);
+
+            }else{
+              pagamento.id = resultado.insertId;
+              console.log('Pagamento ID ' + pagamento.id + ' Criado');
+              res.location('/pagamentos/pagamento/' + pagamento.id);
+              pagamento.status = retorno.dados_do_cartao.status;
+              pagamentoDao.atualiza(pagamento, function(err, result){
+
+                if (err){
+                  res.status(500).send(err);
+
+                }else{
+                  var response = {
+                    dados_do_pagamento: pagamento,
+                    dados_do_cartao: cartao,
+                    links: [
+                      {
+                        href:"http://localhost:3000/pagamentos/pagamento/" + pagamento.id,
+                        rel:"CONFIRMAR",
+                        method:"PUT"
+                      },
+                      {
+                        href:"http://localhost:3000/pagamentos/pagamento/" + pagamento.id,
+                        rel:"CANCELAR",
+                        method:"DELETE"
+                      }
+                    ]
+                  }
+                  res.status(200).send(response);
+                }
+              });
+            }
+          });
+
+        }else{
+          pagamento.id = resultado.insertId;
+          console.log('Pagamento ID ' + pagamento.id + ' Criado');
+          res.location('/pagamentos/pagamento/' + pagamento.id);
+          var response = {
+            dados_do_pagamento: pagamento,
+            links: [
+              {
+                href:"http://localhost:3000/pagamentos/pagamento/" + pagamento.id,
+                rel:"CONFIRMAR",
+                method:"PUT"
+              },
+              {
+                href:"http://localhost:3000/pagamentos/pagamento/" + pagamento.id,
+                rel:"CANCELAR",
+                method:"DELETE"
+              }
+            ]
           }
-        ]
+          res.status(201).json(response);
+        }
       }
-
-      res.status(201).json(response);
-      }
-      connection.end();
     });
-  });
+      //connection.end();
+    });
 
   //ROTA PARA CONFIRMAR OS PAGAMENTOS
   app.put('/pagamentos/pagamento/:id', function(req, res){
     var pagamento = {};
     var id = req.params.id;
-
-    const PAGAMENTO_CONFIRMADO = 'CONFIRMADO';
 
     pagamento.id = id;
     pagamento.status = PAGAMENTO_CONFIRMADO;
@@ -93,7 +138,6 @@ module.exports = function(app){
   app.delete('/pagamentos/pagamento/:id', function(req,res){
     var pagamento = {};
 
-    const PAGAMENTO_CANCELADO = 'CANCELADO;'
     pagamento.id = req.params.id;
     pagamento.status = PAGAMENTO_CANCELADO;
 
